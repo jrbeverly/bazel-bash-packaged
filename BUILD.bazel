@@ -1,0 +1,25 @@
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("//bazel/macros:bats.bzl", "bats_test")
+load("//bazel/rules:deps.bzl", "bats_image")
+
+pkg_tar(
+    name = "cmdcli",
+    srcs = [
+        "src/cmdcli",
+    ],
+    package_dir = "/usr/local/bin",
+)
+
+bats_image(
+    name = "test-runner",
+    image = "@bats-core//image:image.tar",
+)
+
+bats_test(
+    name = "tests",
+    srcs = [
+        "tests/test.bats",
+    ],
+    image = ":test-runner",
+    tars = [":cmdcli"],
+)
