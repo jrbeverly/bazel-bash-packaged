@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+bindir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+if [ -n "${CMD_CLI_TOKEN+1}" ]; then
+  token="${CMD_CLI_TOKEN}"
+elif [ -r "${HOME}/.cmd" ] && [ -f "${HOME}/.cmd" ]; then
+  token=$(sed -n '1p' < "${HOME}/.cmd")
+fi
+
+# TOOL REQUIREMENTS #
+if ! command -v curl &> /dev/null ; then echo "curl could not be found" ; exit 1 ; fi
+if ! command -v jq &> /dev/null ; then echo "jq could not be found" ; exit 1 ; fi
+
+if [ $# -eq 0 ]
+then
+    help
+    exit 0
+fi
+
+# COMMANDS
+
+function version() {
+  echo '0.18.0'
+}
+
+function help() {
+  local a=(${0//\// })
+  local bin=${a[${#a[@]}-1]}
+
+  echo 'Usage:'
+  echo "  ${bin} list [[inputs]]"
+}
+
+function list() {
+  local -r text="$1"
+  if [ -z "${text}" ]; then
+    echo '{"ok": false, "err": "list expects a comma delimited argument"}' |
+        jq -r ${compact} ${monochrome} "${filter:=.}" ; exit 1
+    exit 1
+  fi
+
+  result='{ "results": [] }'
+  IFS=',' read -ra ADDR <<< "$text"
+  for i in "${ADDR[@]}"; do
+    result="$(echo "${result}" | jq ".results |= . + [\"PREFIX_${i}_SUFFIX\"]")"
+  done
+
+  echo "${result}" |
+    jq -r ${compact} ${monochrome} "${filter:=.}"
+}
+
+# COMMAND PARSING #
+cmd="${1}" ; shift
+
+# COMMAND ROUTING #
+case "${cmd}" in
+  --help|-h) help ; exit 0
+  ;;
+  --version|-v) version ; exit 0
+  ;;
+  list)
+    if [ -z "${token}" ]; then
+      echo '{"ok": false, "message": "token for execution is missing"}' |
+        jq -r ${compact} ${monochrome} "${filter:=.}" ; exit 1
+    fi
+    ${cmd} "$@"
+    exit $?
+  ;;
+  *) help ; exit 0
+  ;;
+esac
